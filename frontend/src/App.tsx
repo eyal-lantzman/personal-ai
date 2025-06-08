@@ -1,9 +1,9 @@
 import { useStream } from "@langchain/langgraph-sdk/react";
 import type { Message } from "@langchain/langgraph-sdk";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ProcessedEvent } from "@/components/ActivityTimeline";
-import { WelcomeScreen } from "@/components/WelcomeScreen";
-import { ChatMessagesView } from "@/components/ChatMessagesView";
+import { ProcessedEvent } from "./components/ActivityTimeline";
+import { WelcomeScreen } from "./components/WelcomeScreen";
+import { ChatMessagesView } from "./components/ChatMessagesView";
 
 export default function App() {
   const [processedEventsTimeline, setProcessedEventsTimeline] = useState<
@@ -30,6 +30,7 @@ export default function App() {
       console.log(event);
     },
     onUpdateEvent: (event: any) => {
+      console.log(event);
       let processedEvent: ProcessedEvent | null = null;
       if (event.generate_query) {
         processedEvent = {
@@ -39,24 +40,26 @@ export default function App() {
       } else if (event.web_research) {
         const sources = event.web_research.sources_gathered || [];
         const numSources = sources.length;
-        const uniqueLabels = [
-          ...new Set(sources.map((s: any) => s.label).filter(Boolean)),
-        ];
-        const exampleLabels = uniqueLabels.slice(0, 3).join(", ");
+        const queryLabel = event.web_research.search_query.slice(0,1).join(", ");
         processedEvent = {
           title: "Web Research",
           data: `Gathered ${numSources} sources. Related to: ${
-            exampleLabels || "N/A"
+            queryLabel || "N/A"
           }.`,
         };
       } else if (event.reflection) {
+        let follow_up_queries = null;
+        if (event.reflection.follow_up_queries) {
+          follow_up_queries = event.reflection.follow_up_queries.join(", ");
+        } else {
+          follow_up_queries = "follow up queries...";
+        }
+
         processedEvent = {
           title: "Reflection",
           data: event.reflection.is_sufficient
             ? "Search successful, generating final answer."
-            : `Need more information, searching for ${event.reflection.follow_up_queries.join(
-                ", "
-              )}`,
+            : `Need more information, searching for ${follow_up_queries}`,
         };
       } else if (event.finalize_answer) {
         processedEvent = {

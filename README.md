@@ -1,3 +1,18 @@
+# Important
+This is a fork of Google Gemini quick start, created by Eyal Lantzman.
+All google propriatery dependencies were substituted with open source ones:
+- Models with Qweb3 (tested with qwen3-0.6b and above)
+- Tools with DuckDuckGo search
+- and Inference service with LM studio (tested on fairly old GPU - GTX 1070 Ti)
+All this is done as a personal project, and there are no guartees what's over, about anything!
+When you see comments about google services you can probably ignore them as they were substituted and I didn't want to churn the code more than needed.
+
+P.S. 
+1. I prefered to use 'uv' so you may need to install it. If you don't like it, ignore when it says 'uv pip install ...' and just run 'pip install ...'.
+2. You don't need to setup any GEMINI_API_KEY or other keys, since it's using OSS libraries and service with no API keys required,
+
+Enjoy!
+
 # Gemini Fullstack LangGraph Quickstart
 
 This project demonstrates a fullstack application using a React frontend and a LangGraph-powered backend agent. The agent is designed to perform comprehensive research on a user's query by dynamically generating search terms, querying the web using Google Search, reflecting on the results to identify knowledge gaps, and iteratively refining its search until it can provide a well-supported answer with citations. This application serves as an example of building research-augmented conversational AI using LangGraph and Google's Gemini models.
@@ -40,7 +55,8 @@ Follow these steps to get the application running locally for development and te
 
 ```bash
 cd backend
-pip install .
+uv pip install .
+uv build
 ```
 
 **Frontend:**

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TypedDict
+from typing import TypedDict, Union
 
 from langgraph.graph import add_messages
 from typing_extensions import Annotated
@@ -11,9 +11,24 @@ import operator
 from dataclasses import dataclass, field
 from typing_extensions import Annotated
 
+from langchain_core.messages import MessageLikeRepresentation
+from agent.oss_openai import remove_thinking
+
+Messages = Union[list[MessageLikeRepresentation], MessageLikeRepresentation]
+
+def add_cleaned_messages(
+    left: Messages,
+    right: Messages,
+    *,
+    format:str = "langchain-openai",
+) -> Messages:
+    merged = add_messages(left, right)
+    for message in merged:
+        remove_thinking(message)
+    return merged
 
 class OverallState(TypedDict):
-    messages: Annotated[list, add_messages]
+    messages: Annotated[list, add_cleaned_messages]
     search_query: Annotated[list, operator.add]
     web_research_result: Annotated[list, operator.add]
     sources_gathered: Annotated[list, operator.add]

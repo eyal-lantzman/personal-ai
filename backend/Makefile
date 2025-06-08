@@ -18,6 +18,11 @@ test_profile:
 extended_tests:
 	uv run --with-editable . pytest --only-extended $(TEST_FILE)
 
+dev:
+	@echo "Starting backend development server..."
+	@set BG_JOB_ISOLATED_LOOPS=true
+	@langgraph dev --debug-port 2025 --allow-blocking
+
 
 ######################
 # LINTING AND FORMATTING
