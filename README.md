@@ -1,30 +1,25 @@
-# Important
-This is a fork of Google Gemini quick start, created by Eyal Lantzman.
-All google propriatery dependencies were substituted with open source ones:
-- Models with Qweb3 (tested with qwen3-0.6b and above)
-- Tools with DuckDuckGo search
-- and Inference service with LM studio (tested on fairly old GPU - GTX 1070 Ti)
-All this is done as a personal project, and there are no guartees what's over, about anything!
-When you see comments about google services you can probably ignore them as they were substituted and I didn't want to churn the code more than needed.
+# Acknoledgement
+This is a fork of Google Gemini quick start project.
+If you are looking for official examples, use the original repo!
 
-P.S. 
-1. I prefered to use 'uv' so you may need to install it. If you don't like it, ignore when it says 'uv pip install ...' and just run 'pip install ...'.
-2. You don't need to setup any GEMINI_API_KEY or other keys, since it's using OSS libraries and service with no API keys required,
+This project is in order to running AI locally, and can support commodity hardware e.g. I have GTX 1070 Ti.
+
+This project doesn't incldue tests at this point and not intended for production or critical usage, it's main goal is personal AI usage.
 
 Enjoy!
 
-# Gemini Fullstack LangGraph Quickstart
+# LangGraph Quickstart
 
-This project demonstrates a fullstack application using a React frontend and a LangGraph-powered backend agent. The agent is designed to perform comprehensive research on a user's query by dynamically generating search terms, querying the web using Google Search, reflecting on the results to identify knowledge gaps, and iteratively refining its search until it can provide a well-supported answer with citations. This application serves as an example of building research-augmented conversational AI using LangGraph and Google's Gemini models.
+This project demonstrates a fullstack application using a React frontend and a LangGraph-powered backend agent. The agent is designed to perform comprehensive research on a user's query by dynamically generating search terms, querying the web using Google Search, reflecting on the results to identify knowledge gaps, and iteratively refining its search until it can provide a well-supported answer with citations. This application serves as an example of building research-augmented conversational AI using OpenAI API-compatible models and other tools e.g. DuckDuckGo.
 
-![Gemini Fullstack LangGraph](./app.png)
+![Fullstack LangGraph](./app.png)
 
 ## Features
 
 - 💬 Fullstack application with a React frontend and LangGraph backend.
 - 🧠 Powered by a LangGraph agent for advanced research and conversational AI.
 - 🔍 Dynamic search query generation using Google Gemini models.
-- 🌐 Integrated web research via Google Search API.
+- 🌐 Integrated web research via DuckDuckGo API.
 - 🤔 Reflective reasoning to identify knowledge gaps and refine searches.
 - 📄 Generates answers with citations from gathered sources.
 - 🔄 Hot-reloading for both frontend and backend development during development.
@@ -43,11 +38,8 @@ Follow these steps to get the application running locally for development and te
 **1. Prerequisites:**
 
 -   Node.js and npm (or yarn/pnpm)
--   Python 3.8+
--   **`GEMINI_API_KEY`**: The backend agent requires a Google Gemini API key.
-    1.  Navigate to the `backend/` directory.
-    2.  Create a file named `.env` by copying the `backend/.env.example` file.
-    3.  Open the `.env` file and add your Gemini API key: `GEMINI_API_KEY="YOUR_ACTUAL_API_KEY"`
+-   Python 3.12+
+-   virtualenv -p python3.12 .venv
 
 **2. Install Dependencies:**
 
@@ -55,7 +47,7 @@ Follow these steps to get the application running locally for development and te
 
 ```bash
 cd backend
-uv pip install .
+uv pip install -e '.[dev]'
 uv build
 ```
 
@@ -83,33 +75,15 @@ The core of the backend is a LangGraph agent defined in `backend/src/agent/graph
 
 ![Agent Flow](./agent.png)
 
-1.  **Generate Initial Queries:** Based on your input, it generates a set of initial search queries using a Gemini model.
-2.  **Web Research:** For each query, it uses the Gemini model with the Google Search API to find relevant web pages.
-3.  **Reflection & Knowledge Gap Analysis:** The agent analyzes the search results to determine if the information is sufficient or if there are knowledge gaps. It uses a Gemini model for this reflection process.
+1.  **Generate Initial Queries:** Based on your input, it generates a set of initial search queries using a OpenAI API-compatible model (e.g. Qwen3).
+2.  **Web Research:** For each query, it uses the Gemini model with the DuckDuckGo tool to find relevant web pages.
+3.  **Reflection & Knowledge Gap Analysis:** The agent analyzes the search results to determine if the information is sufficient or if there are knowledge gaps. It uses a OpenAI API-compatible model (e.g. Qwen3) for this reflection process.
 4.  **Iterative Refinement:** If gaps are found or the information is insufficient, it generates follow-up queries and repeats the web research and reflection steps (up to a configured maximum number of loops).
-5.  **Finalize Answer:** Once the research is deemed sufficient, the agent synthesizes the gathered information into a coherent answer, including citations from the web sources, using a Gemini model.
+5.  **Finalize Answer:** Once the research is deemed sufficient, the agent synthesizes the gathered information into a coherent answer, including citations from the web sources, using OpenAI API-compatible model (e.g. Qwen3).
 
 ## Deployment
 
-In production, the backend server serves the optimized static frontend build. LangGraph requires a Redis instance and a Postgres database. Redis is used as a pub-sub broker to enable streaming real time output from background runs. Postgres is used to store assistants, threads, runs, persist thread state and long term memory, and to manage the state of the background task queue with 'exactly once' semantics. For more details on how to deploy the backend server, take a look at the [LangGraph Documentation](https://langchain-ai.github.io/langgraph/concepts/deployment_options/). Below is an example of how to build a Docker image that includes the optimized frontend build and the backend server and run it via `docker-compose`.
-
-_Note: For the docker-compose.yml example you need a LangSmith API key, you can get one from [LangSmith](https://smith.langchain.com/settings)._
-
-_Note: If you are not running the docker-compose.yml example or exposing the backend server to the public internet, you update the `apiUrl` in the `frontend/src/App.tsx` file your host. Currently the `apiUrl` is set to `http://localhost:8123` for docker-compose or `http://localhost:2024` for development._
-
-**1. Build the Docker Image:**
-
-   Run the following command from the **project root directory**:
-   ```bash
-   docker build -t gemini-fullstack-langgraph -f Dockerfile .
-   ```
-**2. Run the Production Server:**
-
-   ```bash
-   GEMINI_API_KEY=<your_gemini_api_key> LANGSMITH_API_KEY=<your_langsmith_api_key> docker-compose up
-   ```
-
-Open your browser and navigate to `http://localhost:8123/app/` to see the application. The API will be available at `http://localhost:8123`.
+In production, the backend server serves the optimized static frontend build. LangGraph requires a Redis instance and a Postgres database. Redis is used as a pub-sub broker to enable streaming real time output from background runs. Postgres is used to store assistants, threads, runs, persist thread state and long term memory, and to manage the state of the background task queue with 'exactly once' semantics. For more details on how to deploy the backend server, take a look at the [LangGraph Documentation](https://langchain-ai.github.io/langgraph/concepts/deployment_options/). 
 
 ## Technologies Used
 
@@ -117,7 +91,9 @@ Open your browser and navigate to `http://localhost:8123/app/` to see the applic
 - [Tailwind CSS](https://tailwindcss.com/) - For styling.
 - [Shadcn UI](https://ui.shadcn.com/) - For components.
 - [LangGraph](https://github.com/langchain-ai/langgraph) - For building the backend research agent.
-- [Google Gemini](https://ai.google.dev/models/gemini) - LLM for query generation, reflection, and answer synthesis.
+- [DuckDuckGo Gemini](https://python.langchain.com/docs/integrations/tools/ddg/) - tool for web searches.
+- [LM Studio](https://lmstudio.ai/) - for providing local inference to models sourced from HuggingFace (GGUF) and providing OpenAI API-compatible interface.
+- [Qwen3](https://huggingface.co/collections/Qwen/qwen3-67dd247413f0e2e4f653967f) - OSS models that support reasoning and tool usage, sourced from HuggingFace.
 
 ## License
 

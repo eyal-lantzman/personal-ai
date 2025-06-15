@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 def remove_thinking(message_or_content):
     def remove_thinking_between_tags(message:str) ->str:
         start_thinking = "<think>"
-        stop_thinking = "</think>"
+        stop_thinking = "</think>\n\n"
         lindex = -1
         rindex = -1
         if start_thinking in message:
@@ -14,7 +14,8 @@ def remove_thinking(message_or_content):
         if stop_thinking in message:
             rindex = message.index(stop_thinking)
         if lindex>=0 and rindex >=0:
-            return message[len(stop_thinking) + rindex + 1:]
+            logger.debug("Removing thinking section: %s", message[:len(stop_thinking) + rindex])
+            return message[len(stop_thinking) + rindex:]
         return message
     
     from langchain_core.messages import BaseMessage
@@ -79,6 +80,7 @@ def get_embeddings(model:str, **kwargs):
         "api_key": "NOT USED",
         "base_url": get_base_url(),
         "model": model,
+        "check_embedding_ctx_length": False
     }
     merged_kwargs = {**args, **kwargs}
     return OpenAIEmbeddings(

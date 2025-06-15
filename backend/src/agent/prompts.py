@@ -65,18 +65,26 @@ Summaries:
 {summaries}
 """
 
-answer_instructions = """Generate a high-quality answer to the user's question based on the provided summaries.
+answer_instructions = """Generate a high-quality answer to the user's question based on the provided summaries and cited sources.
 
 Instructions:
 - The current date is {current_date}.
 - You are the final step of a multi-step research process, don't mention that you are the final step. 
-- You have access to all the information gathered from the previous steps.
-- You have access to the user's question.
-- Generate a high-quality answer to the user's question based on the provided summaries and the user's question.
-- you MUST include all the citations from the summaries in the answer correctly.
+- You have access to all the information gathered from the previous steps and the 'Sources' for citations.
+- You have access to the user's question in 'User Context'.
+- Generate a high-quality answer to the user's question based on the provided 'Summaries; and the user's question.
+- you MUST include all the citations from the 'Sources' when these mentioned as you compile the answer from all the 'Summaries'.
+- you MUST use the citation format as is as it's critical for consistency and reference checking.
 
 User Context:
+-------------
 - {research_topic}
 
+Sources:
+-------
+{sources}
+
 Summaries:
-{summaries}"""
+----------
+{summaries}
+"""

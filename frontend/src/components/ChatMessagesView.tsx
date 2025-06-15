@@ -186,6 +186,32 @@ const AiMessageBubble: React.FC<AiMessageBubbleProps> = ({
     isLastMessage && isOverallLoading ? liveActivity : historicalActivity;
   const isLiveActivityForThisBubble = isLastMessage && isOverallLoading;
 
+  function presentJsonString(json:string) {
+    // TODO: figure out how to do styling in a React way
+    return json;
+  }
+
+  function processMessage(message:Message) {
+      const start_think = "<think>";
+      const end_think = "</think>";
+
+      if (typeof message.content === "string") {
+        if (message.content.startsWith("{") && message.content.endsWith("}")) {
+          return presentJsonString(message.content);
+        } else if (message.content.startsWith(start_think)) {
+          const endOfThink = message.content.lastIndexOf(end_think);
+          if (endOfThink > 0) {
+            return message.content.substring(0, endOfThink + end_think.length + 1)
+          } else {
+            return "Thinking...";
+          }
+        }
+        return message.content;
+      } else {
+        return presentJsonString(JSON.stringify(message.content));
+      }
+  }
+
   return (
     <div className={`relative break-words flex flex-col`}>
       {activityForThisBubble && activityForThisBubble.length > 0 && (
@@ -197,18 +223,14 @@ const AiMessageBubble: React.FC<AiMessageBubbleProps> = ({
         </div>
       )}
       <ReactMarkdown components={mdComponents}>
-        {typeof message.content === "string"
-          ? message.content
-          : JSON.stringify(message.content)}
+        {processMessage(message)}
       </ReactMarkdown>
       <Button
         variant="default"
         className="cursor-pointer bg-neutral-700 border-neutral-600 text-neutral-300 self-end"
         onClick={() =>
           handleCopy(
-            typeof message.content === "string"
-              ? message.content
-              : JSON.stringify(message.content),
+            processMessage(message),
             message.id!
           )
         }

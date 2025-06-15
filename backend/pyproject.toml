@@ -19,15 +19,21 @@ dependencies = [
     "langgraph-sdk>=0.1.57",
     "langgraph-cli",
     "langgraph-api",
+    "langmem",
     "fastapi",
     "openai",
     "ratelimit",
-    "debugpy",
 ]
 
 
 [project.optional-dependencies]
-dev = ["mypy>=1.11.1", "ruff>=0.6.1"]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "mypy>=1.11.1", 
+    "ruff>=0.6.1",
+    "debugpy",
+]
 
 [build-system]
 requires = ["setuptools>=73.0.0", "wheel"]

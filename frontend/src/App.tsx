@@ -19,6 +19,7 @@ export default function App() {
     messages: Message[];
     initial_search_query_count: number;
     max_research_loops: number;
+    search_query_result_limit: number;
     reasoning_model: string;
   }>({
     apiUrl: import.meta.env.DEV
@@ -32,15 +33,30 @@ export default function App() {
     onUpdateEvent: (event: any) => {
       console.log(event);
       let processedEvent: ProcessedEvent | null = null;
-      if (event.generate_query) {
+      if (event.generate_query && event.generate_query.research_query) {
         processedEvent = {
           title: "Generating Search Queries",
-          data: event.generate_query.query_list.join(", "),
+          data: event.generate_query.research_query,
+        };
+      } else if (event.reconcile_search) {
+        const queries = event.recollection.search_query || [];
+        const follow_ups = event.recollection.follow_up_queries || [];
+        const numAdditionalSources = queries.length + follow_ups.length;
+        processedEvent = {
+          title: `Reconciling ${numAdditionalSources} additional queries`,
+          data: event.reconcile_search.search_query.join(", "),
+        };
+      } else if (event.recollection) {
+        const sources = event.recollection.sources_gathered || [];
+        const numSources = sources.length;
+        processedEvent = {
+          title: `Recollected ${numSources} from past memory`,
+          data: event.recollection.search_query,
         };
       } else if (event.web_research) {
         const sources = event.web_research.sources_gathered || [];
         const numSources = sources.length;
-        const queryLabel = event.web_research.search_query.slice(0,1).join(", ");
+        const queryLabel = event.web_research.search_query;
         processedEvent = {
           title: "Web Research",
           data: `Gathered ${numSources} sources. Related to: ${
@@ -57,7 +73,7 @@ export default function App() {
 
         processedEvent = {
           title: "Reflection",
-          data: event.reflection.is_sufficient
+          data: event.reflection.is_knowledge_sufficient
             ? "Search successful, generating final answer."
             : `Need more information, searching for ${follow_up_queries}`,
         };
@@ -67,6 +83,8 @@ export default function App() {
           data: "Composing and presenting the final answer.",
         };
         hasFinalizeEventOccurredRef.current = true;
+      } else {
+        processedEvent = null;
       }
       if (processedEvent) {
         setProcessedEventsTimeline((prevEvents) => [
@@ -117,18 +135,22 @@ export default function App() {
       // high means max 10 loops and 5 queries
       let initial_search_query_count = 0;
       let max_research_loops = 0;
+      let search_query_result_limit = 0;
       switch (effort) {
         case "low":
           initial_search_query_count = 1;
           max_research_loops = 1;
+          search_query_result_limit = 1;
           break;
         case "medium":
           initial_search_query_count = 3;
           max_research_loops = 3;
+          search_query_result_limit = 5;
           break;
         case "high":
           initial_search_query_count = 5;
           max_research_loops = 10;
+          search_query_result_limit = 10;
           break;
       }
 
@@ -144,6 +166,7 @@ export default function App() {
         messages: newMessages,
         initial_search_query_count: initial_search_query_count,
         max_research_loops: max_research_loops,
+        search_query_result_limit: search_query_result_limit,
         reasoning_model: model,
       });
     },

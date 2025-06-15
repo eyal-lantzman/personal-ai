@@ -39,6 +39,12 @@ class Configuration(BaseModel):
         metadata={"description": "The maximum number of research loops to perform."},
     )
 
+    max_search_results: int = Field(
+        default=4,
+        metadata={"description": "The maximum search results to retrieve."},
+    )
+
+
     @classmethod
     def from_runnable_config(
         cls, config: Optional[RunnableConfig] = None
