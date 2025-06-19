@@ -1,0 +1,11 @@
+# --extra-index-url https://download.pytorch.org/whl/cu126 --index-strategy unsafe-best-match
+fastapi[standard]
+starlette
+pybase64
+pydantic
+torch==2.7.0  
+torchvision
+torchaudio
+accelerate
+huggingface_hub
+sentence_transformers

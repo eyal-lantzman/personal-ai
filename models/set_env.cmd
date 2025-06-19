@@ -1,0 +1,2 @@
+set HF_HOME=%cd%
+ECHO %HF_HOME%

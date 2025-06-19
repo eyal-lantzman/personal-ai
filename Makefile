@@ -4,7 +4,7 @@ help:
 	@echo "Available commands:"
 	@echo "  make dev-frontend    - Starts the frontend development server (Vite)"
 	@echo "  make dev-backend     - Starts the backend development server (Uvicorn with reload)"
-	@echo "  make dev             - Starts both frontend and backend development servers"
+	@echo "  make dev-services    - Starts the services development server (FastAPI with reload)"
 
 dev-frontend:
 	@echo "Starting frontend development server..."

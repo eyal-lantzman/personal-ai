@@ -58,16 +58,58 @@ cd frontend
 npm install
 ```
 
-**3. Run Development Servers:**
-
-**Backend & Frontend:**
+**Services:**
 
 ```bash
+cd services
+uv pip install -e '.[dev]' --extra-index-url https://download.pytorch.org/whl/cu126 --index-strategy unsafe-best-match
+# You may need to install the latest transformer library: uv pip install git+https://github.com/huggingface/transformers.git
+uv build
+```
+
+**3. Run Development Servers:**
+
+**Services:**
+This are optional, and only needed if you want to host models directly from HuggingFace.
+
+```bash
+cd services
 make dev
 ```
-This will run the backend and frontend development servers.    Open your browser and navigate to the frontend development server URL (e.g., `http://localhost:5173/app`).
+This will run the uvicorn development servers.    Open your browser and navigate to the frontend development server URL (e.g., `http://127.0.0.1/docs`).
 
-_Alternatively, you can run the backend and frontend development servers separately. For the backend, open a terminal in the `backend/` directory and run `langgraph dev`. The backend API will be available at `http://127.0.0.1:2024`. It will also open a browser window to the LangGraph UI. For the frontend, open a terminal in the `frontend/` directory and run `npm run dev`. The frontend will be available at `http://localhost:5173`._
+You will need to download and cache the models first time, and you need to have a huggingface account and token.
+And then set the environment variables:
+
+```bash
+export HF_HOME:  $(pwd)/../models
+export HF_TOKEN: <YOU TOKEN>
+mkdir $HF_HOME 
+# expecting models director at the same level as "services"
+```
+
+The simplest way is to run the test:
+```bash
+pytest -vv .\tests\test_registry.py
+```
+This will take some time, make sure you have sufficient hard disk space.
+
+**Backend:**
+For the backend, open a terminal in the `backend/` directory and run `langgraph dev` or:
+```bash
+cd backend
+make dev
+```
+The backend API will be available at `http://127.0.0.1:2024` and the debugger or `http://127.0.0.1::2025`.
+
+**Frontend:**
+For the frontend, open a terminal in the `frontend/` directory and run `npm run dev` or:
+```bash
+cd frontend
+make dev
+```
+This will run the frontend development servers.    Open your browser and navigate to the frontend development server URL (e.g., `http://localhost:5173/app`).
+
 
 ## How the Backend Agent Works (High-Level)
 
