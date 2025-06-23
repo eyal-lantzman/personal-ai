@@ -9,7 +9,7 @@ from httpx import ASGITransport, AsyncClient
 
 @pytest.fixture()
 def model_cache():
-    return Path(__file__).parent.parent.parent.parent / "models"
+    return Path(__file__).parent.parent.parent.parent.parent / "models"
 
 @pytest.fixture()
 def setenvvar(monkeypatch, model_cache):

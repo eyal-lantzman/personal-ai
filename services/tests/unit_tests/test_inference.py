@@ -18,7 +18,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-MODELS_CACHE = Path(__file__).parent.parent.parent / "models"
+MODELS_CACHE = Path(__file__).parent.parent.parent.parent / "models"
 TEST_RESOURCES = Path(__file__).parent / "test_resources"
 
 @pytest.fixture(scope="function")

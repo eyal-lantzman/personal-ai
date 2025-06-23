@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 @pytest.fixture
 def model_cache():
-    return Path(__file__).parent.parent.parent.parent/ "models"
+    return Path(__file__).parent.parent.parent.parent.parent / "models"
 
 @pytest.fixture
 def hf_token():
@@ -16,7 +16,7 @@ def hf_token():
         return token
     
     # Otherwise, look for token.env outside of the scope of this project (to avoid leaking it accidentally)
-    token_file = Path(__file__).parent.parent.parent.parent.parent / "token.env"
+    token_file = Path(__file__).parent.parent.parent.parent.parent.parent / "token.env"
     if token_file.exists():
         with token_file.open() as f:
             setting = f.readline()

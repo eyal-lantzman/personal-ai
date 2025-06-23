@@ -43,18 +43,6 @@ memory_manager = MemoryManager()
 
 # Nodes
 def generate_query(state: InitialState, config: RunnableConfig) -> IntermediateState:
-    """LangGraph node that generates a search queries based on the User's question.
-
-    Uses medium model to create an optimized search query for web research based on
-    the User's question.
-
-    Args:
-        state: Current graph state containing the User's question
-        config: Configuration for the runnable, including LLM provider settings
-
-    Returns:
-        Dictionary with state update, including search_query key containing the generated query
-    """
     configurable = Configuration.from_runnable_config(config)
 
     logger.debug("------------->generate_query: %s", str(state))
@@ -116,11 +104,6 @@ def reconcile_research(state: IntermediateState, config: RunnableConfig) -> Inte
     return return_state
 
 def continue_to_parallel_recollection(state: IntermediateState):
-    """LangGraph node that sends the search queries to the web research node.
-
-    This is used to spawn n number of recollection nodes, one for each search query.
-    """
-
     logger.debug("------------->continue_to_parallel_recollection: %s", str(state))
 
     return_state = [ 
@@ -139,11 +122,6 @@ def continue_to_parallel_recollection(state: IntermediateState):
     return return_state
 
 def continue_to_parallel_web_research(state: IntermediateState):
-    """LangGraph node that sends the search queries to the web research node.
-
-    This is used to spawn n number of recollection nodes, one for each search query.
-    """
-
     logger.debug("------------->continue_to_parallel_web_research: %s", str(state))
 
     return_state = [ 
@@ -162,18 +140,6 @@ def continue_to_parallel_web_research(state: IntermediateState):
     return return_state
 
 def web_research(state: SearchTaskInput, config: RunnableConfig) -> Command[Literal["reflection"]]:
-    """LangGraph node that performs web research using the search tool.
-
-    Executes a web search tool.
-
-    Args:
-        state: Current graph state containing the search query and research loop count
-        config: Configuration for the runnable, including search API settings
-
-    Returns:
-        Dictionary with state update, including sources_gathered, search_query, and web_research_results
-    """
-    
     logger.debug("------------->web_research: %s ", str(state))
     
     results = simple_search(
@@ -205,18 +171,6 @@ def web_research(state: SearchTaskInput, config: RunnableConfig) -> Command[Lite
     return command
 
 def recollection(state: RecollTaskInput, config: RunnableConfig) -> Command[Literal["reflection"]]:
-    """LangGraph node that performs recollaction.
-
-    Executes a memory tool in combination with LLM.
-
-    Args:
-        state: Current graph state containing the search query and research loop count
-        config: Configuration for the runnable, including search API settings
-
-    Returns:
-        Dictionary with state update, including sources_gathered, search_query, and web_research_results
-    """
-    
     logger.debug("------------->recollection: %s ", str(state))
 
     results = memory_manager.recoll_search(
@@ -243,19 +197,6 @@ def recollection(state: RecollTaskInput, config: RunnableConfig) -> Command[Lite
     return command
 
 def reflection(state: IntermediateState, config: RunnableConfig) -> IntermediateState:
-    """LangGraph node that identifies knowledge gaps and generates potential follow-up queries.
-
-    Analyzes the current summary to identify areas for further research and generates
-    potential follow-up queries. Uses structured output to extract
-    the follow-up query in JSON format.
-
-    Args:
-        state: Current graph state containing the running summary and research topic
-        config: Configuration for the runnable, including LLM provider settings
-
-    Returns:
-        Dictionary with state update, including search_query key containing the generated follow-up query
-    """
     configurable = Configuration.from_runnable_config(config)
     logger.debug("------------->reflection: %s", str(state))
 
@@ -290,18 +231,6 @@ def evaluate_research(
     state: IntermediateState,
     config: RunnableConfig,
 ) -> IntermediateState:
-    """LangGraph routing function that determines the next step in the research flow.
-
-    Controls the research loop by deciding whether to continue gathering information
-    or to finalize the summary based on the configured maximum number of research loops.
-
-    Args:
-        state: Current graph state containing the research loop count
-        config: Configuration for the runnable, including max_research_loops setting
-
-    Returns:
-        String literal indicating the next node to visit ("web_research" or "finalize_summary")
-    """
     configurable = Configuration.from_runnable_config(config)
 
     logger.debug("------------->evaluate_research: %s", str(state))
@@ -317,18 +246,6 @@ def evaluate_research(
     return return_state
 
 def finalize_answer(state: IntermediateState, config: RunnableConfig) -> FinalState:
-    """LangGraph node that finalizes the research summary.
-
-    Prepares the final output by deduplicating and formatting sources, then
-    combining them with the running summary to create a well-structured
-    research report with proper citations.
-
-    Args:
-        state: Current graph state containing the running summary and sources gathered
-
-    Returns:
-        Dictionary with state update, including running_summary key containing the formatted final summary with sources
-    """
     configurable = Configuration.from_runnable_config(config)
 
     logger.debug("------------->finalize_answer: %s", str(state))

@@ -2,12 +2,14 @@ from fastapi import FastAPI,  Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.middleware.sessions import SessionMiddleware
 
 from services.registry import registry_router
 from services.healthcheck import healthcheck_router
 from services.chat import chat_router
 from services.embeddings import embeddings_router
 from services.models import models_router
+from services.lm_studio_load_balancer import lm_studio_lb_router
 
 import logging
 
@@ -21,6 +23,17 @@ origins = [
 
 app = FastAPI()
 
+# TODO: is not really production quaility, this needs to be pulled from some secret vault instead.
+app.add_middleware(SessionMiddleware, secret_key="some-random-string")
+
+@app.middleware("http")
+async def reuse_session(request: Request, call_next):
+    response = await call_next(request)
+    session = request.cookies.get("session")
+    if session:
+        response.set_cookie(key="session", value=request.cookies.get("session"), httponly=True)
+    return response
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -29,12 +42,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(router=healthcheck_router, prefix='/health')
-app.include_router(router=chat_router, prefix='/chat')
-app.include_router(router=embeddings_router, prefix='/embeddings')
-app.include_router(router=registry_router, prefix='/registry')
-app.include_router(router=models_router, prefix='/models')
-
+app.include_router(router=healthcheck_router, prefix='/health', tags=["Health Check"])
+app.include_router(router=chat_router, prefix='/chat', tags=["OpenAI API compatible"])
+app.include_router(router=embeddings_router, prefix='/embeddings', tags=["OpenAI API compatible"])
+app.include_router(router=registry_router, prefix='/registry', tags=["Model Registry"])
+app.include_router(router=models_router, prefix='/models', tags=["OpenAI API compatible"])
+app.include_router(router=lm_studio_lb_router, prefix='/lm_studio_lb', tags=["LM Studio LB Proxy"])
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):

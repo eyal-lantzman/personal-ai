@@ -6,7 +6,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-MODELS_CACHE = Path(__file__).parent.parent.parent / "models"
+MODELS_CACHE = Path(__file__).parent.parent.parent.parent / "models"
 
 def test_init_loads_models_from_cache():
     expected = list()

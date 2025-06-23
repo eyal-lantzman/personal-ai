@@ -18,6 +18,7 @@ dependencies = {file = "requirements.txt"}
 dev = [
     "pytest",
     "pytest-asyncio",
+    "openai",
     "mypy>=1.11.1", 
     "ruff>=0.6.1",
     "debugpy",
