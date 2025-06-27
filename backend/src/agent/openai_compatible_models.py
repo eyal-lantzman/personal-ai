@@ -1,4 +1,4 @@
-from agent.lm_server import get_loaded_model, get_base_url
+from agent.lm_studio_server import get_loaded_model, get_base_url
 import logging
 
 logger = logging.getLogger(__name__)
@@ -66,11 +66,6 @@ def get_chat(**kwargs):
 def get_text_embedding(model:str = None, **kwargs):
     """Returns langchain OpenAI embeddings compatible client for general text embeddings."""
     default_model = model or "text-embedding-granite-embedding-278m-multilingual"
-    return get_embeddings(model=default_model, **kwargs)
-
-def get_code_embedding(model:str= None, **kwargs):
-    """Returns langchain OpenAI embeddings compatible client for general code embeddings."""
-    default_model = model or "jina-embeddings-v2-base-code"
     return get_embeddings(model=default_model, **kwargs)
 
 def get_embeddings(model:str, **kwargs):

@@ -207,3 +207,5 @@ cython_debug/
 #.idea/
 
 backend/.langgraph_api
+.roo/mcp.json
+.continue/mcpServers/new-mcp-server.yaml

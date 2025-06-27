@@ -27,9 +27,7 @@ from agent.prompts import (
 from agent.openai_compatible_models import get_chat, remove_thinking
 from agent.web_search import simple_search, identify_region
 from agent.memory_recollection import MemoryManager, WebSearchMemory
-from agent.utils import (
-    get_research_topic,
-)
+from agent.utils import get_research_topic
 
 load_dotenv()
 
@@ -45,15 +43,12 @@ memory_manager = MemoryManager()
 def generate_query(state: InitialState, config: RunnableConfig) -> IntermediateState:
     configurable = Configuration.from_runnable_config(config)
 
-    logger.debug("------------->generate_query: %s", str(state))
-
     # init Generator Model
     llm = get_chat(
         model=configurable.medium_model,
         temperature=1.0,
         max_retries=2,
     )
-    structured_llm = llm.with_structured_output(SearchQueryList)
 
     # Format the prompt
     research_query = state.get("research_query") or get_research_topic(state["messages"])
@@ -69,15 +64,15 @@ def generate_query(state: InitialState, config: RunnableConfig) -> IntermediateS
     # TODO: parallelize 
 
     # Generate the search queries
-    result:SearchQueryList = structured_llm.invoke(formatted_prompt)
+    result:SearchQueryList = llm.with_structured_output(SearchQueryList).invoke(formatted_prompt)
 
     # Identify the search region
     search_region  = identify_region(research_query)
 
     return_state = IntermediateState(
         research_query = research_query,
-        search_query = result.query,
-        is_sufficient = False,
+        search_query = frozenset(result.query),
+        is_knowledge_sufficient = False,
         initial_search_query_count = initial_search_query_count,
         search_query_result_limit = state.get("search_query_result_limit", configurable.max_search_results),
         max_research_loops = state.get("max_research_loops", configurable.max_research_loops),
@@ -85,27 +80,23 @@ def generate_query(state: InitialState, config: RunnableConfig) -> IntermediateS
         search_region = search_region
     )
     
-    logger.debug("generate_query-------------> %s", str(return_state))
     return return_state
 
 def reconcile_research(state: IntermediateState, config: RunnableConfig) -> IntermediateState:
-    search_queries = state["search_query"]
-    if state.get("follow_up_queries"):
-        search_queries.union(state.get("follow_up_queries"))
+    search_queries = list(state["search_query"])
+
+    search_queries.extend(state.get("follow_up_queries", []))
     
     return_state = IntermediateState(
-        search_query=search_queries,
-        follow_up_queries = set(),
-        research_loop_count = 0 if state.get("research_loop_count", 0) == 0 is None else 1, #Auto increment
+        search_query=frozenset(search_queries),
+        follow_up_queries = [],
+        research_loop_count = 0 if state.get("research_loop_count", None) is None else 1, #Auto increment
         number_of_ran_queries = state.get("number_of_ran_queries", 0)
     )
     
-    logger.debug("reconcile_research-------------> %s", str(return_state))
     return return_state
 
 def continue_to_parallel_recollection(state: IntermediateState):
-    logger.debug("------------->continue_to_parallel_recollection: %s", str(state))
-
     return_state = [ 
             Send(
                 node="recollection", 
@@ -115,15 +106,12 @@ def continue_to_parallel_recollection(state: IntermediateState):
                     search_query_result_limit = state["search_query_result_limit"]
                 )
             )
-        for idx, search_query in enumerate(state["search_query"])
+        for idx, search_query in enumerate(sorted(state["search_query"]))
     ]
 
-    logger.debug("continue_to_parallel_recollection-------------> %s", str(return_state))
     return return_state
 
 def continue_to_parallel_web_research(state: IntermediateState):
-    logger.debug("------------->continue_to_parallel_web_research: %s", str(state))
-
     return_state = [ 
             Send(
                 node="web_research", 
@@ -133,15 +121,12 @@ def continue_to_parallel_web_research(state: IntermediateState):
                     search_query_result_limit = state["search_query_result_limit"]
                 )
             )
-        for idx, search_query in enumerate(state["search_query"])
+        for idx, search_query in enumerate(sorted(state["search_query"]))
     ]
 
-    logger.debug("continue_to_parallel_web_research-------------> %s", str(return_state))
     return return_state
 
 def web_research(state: SearchTaskInput, config: RunnableConfig) -> Command[Literal["reflection"]]:
-    logger.debug("------------->web_research: %s ", str(state))
-    
     results = simple_search(
         state["id"], 
         state["search_query"], 
@@ -167,12 +152,9 @@ def web_research(state: SearchTaskInput, config: RunnableConfig) -> Command[Lite
             sources_gathered=frozenset(return_state["sources_gathered"])), 
         goto="reflection")
 
-    logger.debug("web_research-------------> %s", str(command))
     return command
 
 def recollection(state: RecollTaskInput, config: RunnableConfig) -> Command[Literal["reflection"]]:
-    logger.debug("------------->recollection: %s ", str(state))
-
     results = memory_manager.recoll_search(
         state["id"], 
         state["search_query"], 
@@ -193,12 +175,10 @@ def recollection(state: RecollTaskInput, config: RunnableConfig) -> Command[Lite
     else:
         command = Command(goto="reflection")
 
-    logger.debug("recollection-------------> %s", str(command))
     return command
 
 def reflection(state: IntermediateState, config: RunnableConfig) -> IntermediateState:
     configurable = Configuration.from_runnable_config(config)
-    logger.debug("------------->reflection: %s", str(state))
 
     reasoning_model = state.get("reasoning_model", configurable.large_model)
 
@@ -206,7 +186,7 @@ def reflection(state: IntermediateState, config: RunnableConfig) -> Intermediate
     current_date = get_current_date()
     formatted_prompt = reflection_instructions.format(
         current_date=current_date,
-        research_topic=get_research_topic(state["messages"]),
+        research_topic=state["research_query"] or get_research_topic(state["messages"]),
         summaries="\n\n---\n\n".join(state["web_research_result"]),
     )
     # init Reasoning Model
@@ -219,37 +199,28 @@ def reflection(state: IntermediateState, config: RunnableConfig) -> Intermediate
 
     return_state = IntermediateState(
         is_knowledge_sufficient = result.is_sufficient,
-        follow_up_queries = set(result.follow_up_queries),
+        follow_up_queries = list(sorted(set(result.follow_up_queries))),
         number_of_ran_queries = len(state["search_query"]),
     )
 
-    logger.debug("reflection-------------> %s", str(return_state))
     return return_state
 
 
 def evaluate_research(
     state: IntermediateState,
     config: RunnableConfig,
-) -> IntermediateState:
-    configurable = Configuration.from_runnable_config(config)
-
-    logger.debug("------------->evaluate_research: %s", str(state))
+) -> Literal["reconcile_research", "finalize_answer"]:
 
     max_research_loops = state.get("max_research_loops")
    
-    if state.get("is_sufficient", False) or state.get("research_loop_count") >= max_research_loops:
+    if state.get("is_knowledge_sufficient", False) or state.get("research_loop_count") >= max_research_loops:
         return_state = "finalize_answer"
     else:
         return_state = "reconcile_research"
 
-    logger.debug("evaluate_research-------------> %s", str(return_state))
     return return_state
 
 def finalize_answer(state: IntermediateState, config: RunnableConfig) -> FinalState:
-    configurable = Configuration.from_runnable_config(config)
-
-    logger.debug("------------->finalize_answer: %s", str(state))
-
     reasoning_model = state.get("reasoning_model")
 
     # Format the prompt
@@ -270,14 +241,14 @@ def finalize_answer(state: IntermediateState, config: RunnableConfig) -> FinalSt
     result = llm.invoke(formatted_prompt)
     remove_thinking(result)
 
-    final_content = "Summary:\n---------------\n" + result.content + "\n\nSources:\n---------------\n " + "\n ".join(state["sources_gathered"])
+    sources = sorted(state["sources_gathered"])
+    final_content = "Summary:\n---------------\n" + result.content + "\n\nSources:\n---------------\n " + "\n ".join(sources)
     return_state = FinalState(
         summary = result.content, 
-        sources = state["sources_gathered"],
+        sources = sources,
         messages = [AIMessage(content=final_content)],
     )
 
-    logger.debug("finalize_answer-------------> %s", str(return_state))
     return return_state
 
 
