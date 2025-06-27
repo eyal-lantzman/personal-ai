@@ -27,7 +27,7 @@ def hf_token():
 
 @pytest.fixture
 def setenvvar(monkeypatch, model_cache, hf_token):
-    with mock.patch.dict(os.environ, clear=True):
+    with mock.patch.dict(os.environ, clear=False):
         envvars = {
             "HF_HOME": str(model_cache),
             "HF_TOKEN": hf_token
@@ -39,7 +39,7 @@ def setenvvar(monkeypatch, model_cache, hf_token):
 @pytest.fixture
 def client(setenvvar):
     from services.app import app
-    return TestClient(app)
+    yield TestClient(app)
 
 def test_list_models(client):
     from services.registry import REGISTRY

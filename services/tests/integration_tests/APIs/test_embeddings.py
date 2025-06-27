@@ -10,7 +10,7 @@ def model_cache():
 
 @pytest.fixture()
 def setenvvar(monkeypatch, model_cache):
-    with mock.patch.dict(os.environ, clear=True):
+    with mock.patch.dict(os.environ, clear=False):
         envvars = {
             "HF_HOME": str(model_cache),
         }
@@ -21,7 +21,7 @@ def setenvvar(monkeypatch, model_cache):
 @pytest.fixture()
 def client(setenvvar):
     from services.app import app
-    return TestClient(app)
+    yield TestClient(app)
 
 def test_create_embeddings_not_supported(client):
     from services.embeddings import CreateEmbeddingsRequest
