@@ -20,6 +20,7 @@ extended_tests:
 
 dev:
 	@echo "Starting services server..."
+	@set MCP_ROOT=%cd%\..\..
 	@uvicorn services.app:app --host 0.0.0.0 --port 80 --reload
 
 

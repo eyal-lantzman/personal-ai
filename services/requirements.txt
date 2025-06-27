@@ -10,3 +10,5 @@ torchaudio
 accelerate
 huggingface_hub
 sentence_transformers
+fastmcp
+langchain_mcp_adapters
