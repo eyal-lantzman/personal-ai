@@ -1,9 +1,8 @@
-import contextlib
 import os
 import tempfile
 from typing import AsyncIterator
+from anyio import get_cancelled_exc_class
 from fastapi import FastAPI,  Request, status
-from fastapi.routing import Mount
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -43,8 +42,8 @@ async def setup_mcp(app: FastAPI) -> AsyncIterator[State]:
         await mcp_server.start_session()
         yield {"mcp": mcp_server.mcp }
         await mcp_server.stop_session()
-    except Exception as e:
-         logger.error(e)
+    except get_cancelled_exc_class():
+        raise
 
 app = FastAPI(lifespan=lifespan)
 

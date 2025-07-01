@@ -1,6 +1,12 @@
 import asyncio
+import concurrent
+import uuid
 from pydantic import BaseModel, Field
 from typing import Optional, Any
+from collections.abc import Callable
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ActionResult(BaseModel):
     result: Optional[Any] = None
@@ -9,16 +15,19 @@ class ActionResult(BaseModel):
     completed: Optional[bool] = False
     succeeded: Optional[bool] = False
 
+    class Config:
+        arbitrary_types_allowed = True
 
 class _Runnable(BaseModel):
     id: str
-    func: function
+    func: Callable
     args: Optional[list] = Field(default_factory=list)
     kwargs : Optional[dict] = Field(default_factory=dict)
-    # retry_on_exceptions: Optional[list[Exception]] = Field(default_factory=list)
-    # max_retries: Optional[int] = 0
-    task = Optional[asyncio.Task[ActionResult]] = None
-    result: Optional[ActionResult] = None
+    result:ActionResult = Field(default_factory=ActionResult)
+    task: Optional[asyncio.Task[ActionResult]] = None
+
+    class Config:
+        arbitrary_types_allowed = True
     
 
 class ActionManager:
@@ -34,11 +43,15 @@ class ActionManager:
                             queue reaches max_size, until an action is finished running.
         """
         self.concurrency = concurrency
-        self.queue = asyncio.queues.PriorityQueue[_Runnable](max_size)
+        self.tasks = dict[str, asyncio.Task[ActionResult]]()
         self.loop = asyncio.new_event_loop()
+        self.loop.set_task_factory(asyncio.eager_task_factory)
+        self.loop.set_default_executor(concurrent.futures.ThreadPoolExecutor(max_workers=concurrency))
+        self.incoming = asyncio.queues.PriorityQueue[_Runnable](max_size)
+
         self.looping = False
 
-    def schedule(self, func:function, id:str=None, priority:int=10, *args, **kwargs) -> asyncio.Task[ActionResult]:
+    def schedule(self, func:Callable, *args, id:str=None, priority:int=10,  **kwargs) -> asyncio.Task[str]:
         """Schedule function call, and wait until scheduled.
 
         Args:
@@ -50,39 +63,74 @@ class ActionManager:
             kwargs(dict): Optional dict of key-value arguments.
 
         Returns:
-            None
+            asyncio.Task: Scheduling task, with and id of the execution task.
         """
-        runnable = _Runnable(func=func, args=args, kwargs=kwargs, id=id or func.__qualname__)
+        runnable = _Runnable(func=func, args=args, kwargs=kwargs, id=id or func.__qualname__ + str(uuid.uuid4()))
         runnable.result = ActionResult()
 
         async def _run():
-            await self.queue.put((priority, runnable))
-            return runnable.result
+            await self.incoming.put((priority, runnable))
+            return runnable.id
         
-        runnable.task = asyncio.create_task(_run)
+        task = self.loop.create_task(_run(), name="enqueue")
+        self.tasks[runnable.id] = None
 
-        return runnable.task
+        return task
 
-    def _run_work(self, work:_Runnable) -> Any:
+    def _do_work(self, runnable:_Runnable) -> ActionResult:
         try:
-            result = work.func(work.args, work.kwargs)
-            work.result.result = result
-            work.result.succeeded = True
+            logger.debug("Running task %s", runnable.id)
+            runnable.result.result = runnable.func(*runnable.args, **runnable.kwargs)
+            runnable.result.succeeded = True
+            logger.debug("Success in task %s", runnable.id)
+        except asyncio.CancelledError as e:
+            logger.debug("Cancelled task %s", runnable.id)
+            runnable.result.last_error = e
+            raise
         except Exception as e:
-            work.result.last_error = e
+            logger.debug("Error in task %s", runnable.id)
+            runnable.result.last_error = e
         finally:
-            work.result.completed = True
-
+            runnable.result.completed = True
+            logger.debug("Completed task %s", runnable.id)
+        return runnable.result
 
     async def _run(self):
         while self.looping:
-            work = await self.queue.get()
-            self._run_work(work)
+            try:
+                priority, work = await self.incoming.get()
+                future = self.loop.run_in_executor(None, self._do_work, work)
+                self.tasks[work.id] = future
+                self.incoming.task_done()
+            except asyncio.CancelledError as e:
+                raise
+            except Exception as e:
+                logger.error(e)
 
     def start(self):
         self.looping = True
-        self.main_loop = asyncio.create_task(self._run)
+        self.background_run = self.loop.create_task(self._run(), name="background_run")
 
-    def stop(self) -> bool:
-        self.looping = False
-        return self.main_loop.cancel()
+    def wait_for_empty_queue(self):
+        while not self.incoming.empty():
+            asyncio.get_event_loop().run_until_complete(asyncio.sleep(1))
+
+    def wait_for_completion(self, awaitable:asyncio.Task | asyncio.Future):
+        return self.loop.run_until_complete(awaitable)
+
+    def wait_for_execution(self, id:str) -> ActionResult:
+        if id not in self.tasks:
+            raise ValueError("Id is not present in the queue: %s", id)
+        
+        while self.tasks[id] is None:
+            asyncio.get_event_loop().run_until_complete(asyncio.sleep(1))
+
+        return self.wait_for_completion(self.tasks[id])
+
+    def stop(self, msg: Any|None = None) -> bool:
+        if self.looping:
+            self.looping = False
+            asyncio.runners._cancel_all_tasks(self.loop)
+            cancelled = self.background_run.cancel(msg)
+            self.loop.stop()
+            return cancelled
