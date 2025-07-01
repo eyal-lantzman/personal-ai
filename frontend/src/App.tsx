@@ -22,9 +22,9 @@ export default function App() {
     search_query_result_limit: number;
     reasoning_model: string;
   }>({
-    apiUrl: import.meta.env.DEV
-      ? "http://localhost:2024"
-      : "http://localhost:8123",
+    apiUrl: import.meta.env.VITE_API_URL || (import.meta.env.DEV
+      ? "http://127.0.0.1:2024"
+      : "http://localhost:8123"),
     assistantId: "agent",
     messagesKey: "messages",
     onFinish: (event: any) => {

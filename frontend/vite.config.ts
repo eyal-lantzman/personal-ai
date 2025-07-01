@@ -9,10 +9,19 @@ export default defineConfig({
   base: "/app/",
   resolve: {
     alias: {
-      "@": path.resolve(new URL(".", import.meta.url).pathname, "./src"),
+      "@": path.resolve(__dirname, "./src"),
     },
   },
   server: {
+    host: "localhost", // to allow access to all network requests use 0.0.0.0
+    port: 5173,
+    strictPort: true,
+    origin: "http://localhost:5173",
+    // Configure CORS securely for the Vite dev server to allow requests from localhost,
+    // supports additional hostnames (via regex). If you use another `project_tld`, adjust this.
+    cors: {
+      origin: "http://localhost:5173",
+    },
     proxy: {
       // Proxy API requests to the backend server
       "/api": {
