@@ -1,6 +1,7 @@
 import contextlib
 import os
 import tempfile
+from typing import AsyncIterator
 from fastapi import FastAPI,  Request, status
 from fastapi.routing import Mount
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +15,10 @@ from services.embeddings import embeddings_router
 from services.models import models_router
 from services.lm_studio_load_balancer import lm_studio_lb_router
 from services.mcp_tools.mcp_server import MCPProjectServer
+from services.lifespan import ManagedLifespan, State
+
+lifespan = ManagedLifespan()
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -24,18 +29,20 @@ origins = [
     "http://localhost:8080",
 ]
 
+mcp_transport = os.getenv("MCP_TRANSPORT", "streamable-http")
+mcp_debug = bool(os.getenv("MCP_DEBUG", "True"))
+
 mcp_server = MCPProjectServer(
     root=os.getenv("MCP_ROOT", tempfile.gettempdir()),
     enable_fs=True,
 )
-mcp_transport = os.getenv("MCP_TRANSPORT", "streamable-http")
-mcp_debug = bool(os.getenv("MCP_DEBUG", "True"))
 
-@contextlib.asynccontextmanager
-async def lifespan(app: FastAPI):
+@lifespan.add
+async def setup_mcp(app: FastAPI) -> AsyncIterator[State]:
     try:
         await mcp_server.start_session()
-        yield
+        yield {"mcp": mcp_server.mcp }
+        await mcp_server.stop_session()
     except Exception as e:
          logger.error(e)
 

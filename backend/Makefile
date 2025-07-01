@@ -25,7 +25,7 @@ dev:
 
 init:
 	@echo "Preparing backend uv packages"
-	@pip install -e '.[dev]'
+	@uv pip install -e '.[dev]'
 
 build:
 	@echo "Building backend"

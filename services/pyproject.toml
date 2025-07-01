@@ -21,6 +21,7 @@ dev = [
     "openai",
     "mypy>=1.11.1", 
     "ruff>=0.6.1",
+    "asgi-lifespan",
     "debugpy",
 ]
 

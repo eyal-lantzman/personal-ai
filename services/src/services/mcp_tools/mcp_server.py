@@ -57,7 +57,7 @@ class MCPProjectServer:
 
     async def stop_session(self):
         if self.generator_started:
-            await self.generator.__aexit__()
+            await self.generator.__aexit__(None, None, None)
         self.generator_started = False
         self.generator = None
         self.app = None

@@ -23,6 +23,14 @@ dev:
 	@set MCP_ROOT=%cd%\..\..
 	@uvicorn services.app:app --host 0.0.0.0 --port 80 --reload
 
+init:
+	@echo "Preparing backend uv packages"
+	@uv pip install -e '.[dev]' --extra-index-url https://download.pytorch.org/whl/cu126 --index-strategy unsafe-best-match
+
+build:
+	@echo "Building backend"
+	@uv build
+
 
 ######################
 # LINTING AND FORMATTING
