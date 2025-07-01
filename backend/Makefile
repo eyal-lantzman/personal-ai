@@ -1,4 +1,4 @@
-.PHONY: all format lint test tests test_watch integration_tests docker_tests help extended_tests
+.PHONY: all format lint test tests test_watch integration_tests docker_tests help extended_tests dev init 
 
 # Default target executed when no arguments are given to make.
 all: help
@@ -21,8 +21,15 @@ extended_tests:
 dev:
 	@echo "Starting backend development server..."
 	@set BG_JOB_ISOLATED_LOOPS=true
-	@langgraph dev --debug-port 2025 --allow-blocking
+	@langgraph dev --debug-port 2025
 
+init:
+	@echo "Preparing backend uv packages"
+	@pip install -e '.[dev]'
+
+build:
+	@echo "Building backend"
+	@uv build
 
 ######################
 # LINTING AND FORMATTING
@@ -60,10 +67,12 @@ spell_fix:
 
 help:
 	@echo '----'
-	@echo 'format                       - run code formatters'
-	@echo 'lint                         - run linters'
-	@echo 'test                         - run unit tests'
-	@echo 'tests                        - run unit tests'
-	@echo 'test TEST_FILE=<test_file>   - run all tests in file'
-	@echo 'test_watch                   - run unit tests in watch mode'
-
+	@echo 'make format                       - run code formatters'
+	@echo 'make lint                         - run linters'
+	@echo 'make test                         - run unit tests'
+	@echo 'make tests                        - run unit tests'
+	@echo 'make test TEST_FILE=<test_file>   - run all tests in file'
+	@echo 'make test_watch                   - run unit tests in watch mode'
+	@echo 'make init   						 - Initializes the project runtime'
+	@echo 'make build  						 - Builds the project'
+	@echo 'make dev    						 - Starts the backend server (fastAPI)''

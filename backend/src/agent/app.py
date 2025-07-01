@@ -1,12 +1,26 @@
 # mypy: disable - error - code = "no-untyped-def,misc"
 import pathlib
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Response
 from fastapi.staticfiles import StaticFiles
-import fastapi.exceptions
+from fastapi.middleware.cors import CORSMiddleware
 
 # Define the FastAPI app
-app = FastAPI()
+app = FastAPI(debug=True)
 
+origins = [
+    "http://localhost",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://smith.langchain.com",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 def create_frontend_router(build_dir="../frontend/dist"):
     """Creates a router to serve the React frontend.
@@ -18,8 +32,7 @@ def create_frontend_router(build_dir="../frontend/dist"):
         A Starlette application serving the frontend.
     """
     build_path = pathlib.Path(__file__).parent.parent.parent / build_dir
-    static_files_path = build_path / "assets"  # Vite uses 'assets' subdir
-
+    
     if not build_path.is_dir() or not (build_path / "index.html").is_file():
         print(
             f"WARN: Frontend build directory not found or incomplete at {build_path}. Serving frontend will likely fail."
@@ -36,21 +49,7 @@ def create_frontend_router(build_dir="../frontend/dist"):
 
         return Route("/{path:path}", endpoint=dummy_frontend)
 
-    build_dir = pathlib.Path(build_dir)
-
-    react = FastAPI(openapi_url="")
-    react.mount(
-        "/assets", StaticFiles(directory=static_files_path), name="static_assets"
-    )
-
-    @react.get("/{path:path}")
-    async def handle_catch_all(request: Request, path: str):
-        fp = build_path / path
-        if not fp.exists() or not fp.is_file():
-            fp = build_path / "index.html"
-        return fastapi.responses.FileResponse(fp)
-
-    return react
+    return StaticFiles(directory=build_path, html=True)
 
 
 # Mount the frontend under /app to not conflict with the LangGraph API routes

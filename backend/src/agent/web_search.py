@@ -1,7 +1,6 @@
 from pydantic import BaseModel, RootModel, Field
 from typing import List
 from langchain_core.output_parsers import PydanticOutputParser
-from langchain_core.messages import BaseMessage
 from langchain_core.tools import tool
 from ratelimit import limits, RateLimitException, sleep_and_retry
 from agent.tools_and_schemas import AggregatedSearchResults
@@ -11,8 +10,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-RATE_CALLS = 10
-RATE_PER_SECONDS = 60
+RATE_CALLS = 2
+RATE_PER_SECONDS = 5
 
 # See also:https://duckduckgo.com/duckduckgo-help-pages/settings/params
 _REGIONS = {
@@ -154,22 +153,37 @@ def _aggregate_results(prefix:int, query:str, search_results:SimpleSearchResults
 @sleep_and_retry
 @limits(calls=RATE_CALLS, period=RATE_PER_SECONDS)
 def _search(query:str, num_results:int = 4, region:str = None):
-    from duckduckgo_search.exceptions import DuckDuckGoSearchException
+    import duckduckgo_search.exceptions as ddg_exceptions
     from langchain_community.tools import DuckDuckGoSearchResults
+    from langchain_community.utilities.duckduckgo_search import DuckDuckGoSearchAPIWrapper
     # TODO:
-    # 1. consider other backend
-    # backend:
-    #       auto - try all backends in random order,
-    #       html - collect data from https://html.duckduckgo.com,
-    #       lite - collect data from https://lite.duckduckgo.com.
-    # 2. consider news, image, video search with safesearch on/off/moderate
-    service = DuckDuckGoSearchResults(output_format="json", backend="text", region=region or "wt-wt", num_results=num_results)
-    try:
-        return service.invoke(query)
-    except DuckDuckGoSearchException as e:
-        import random
-        raise RateLimitException(repr(e), random.randint(1, 10))
-
+    # consider news, image, video search 
+    for backend in ["html", "lite"]:
+        search_region = region=region or "wt-wt"
+        search_source = "text"
+        search_results = num_results 
+        service = DuckDuckGoSearchResults(
+            output_format="json", 
+            backend=search_source, 
+            num_results=search_results,
+            region=search_region,
+            api_wrapper=DuckDuckGoSearchAPIWrapper(
+                region=search_region, 
+                backend=backend,
+                source=search_source, 
+                max_results=search_results, 
+                safesearch="off"),
+            )
+        try:
+            return service.invoke(query)
+        except (ddg_exceptions.DuckDuckGoSearchException, ddg_exceptions.TimeoutException) as e:
+            logger.warning("Search err: %s", e)
+            continue
+        except ddg_exceptions.RatelimitException as e:
+            import random
+            raise RateLimitException(repr(e), random.randint(1, 10))
+    # Failed, return an empty search result
+    return "[]"
 
 @tool(description="Useful to for when you need to answer questions about current events. Input should be a search query.", 
       return_direct=True)

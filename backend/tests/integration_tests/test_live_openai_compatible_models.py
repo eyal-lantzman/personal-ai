@@ -14,5 +14,5 @@ def test_get_openai_client():
     assert client.models.list() is not None
 
 def test_get_text_embedding():
-    embedding = get_text_embedding(model="text-embedding-granite-embedding-278m-multilingual")
+    embedding = get_text_embedding()
     assert embedding is not None

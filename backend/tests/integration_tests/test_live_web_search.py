@@ -20,6 +20,7 @@ def test_identify_region(query, expected_results, run):
 @pytest.mark.parametrize("run", range(TEST_RUNS))
 def test_simple_search(run):
     results = simple_search(run, query="What's new?", num_results=run+1)
+    logger.info(results)
     assert len(results.web_research_results) == run+1
     assert len(results.sources_gathered) == run+1
     for i, source in enumerate(results.sources_gathered):

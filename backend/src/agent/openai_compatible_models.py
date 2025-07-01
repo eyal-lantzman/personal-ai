@@ -65,7 +65,7 @@ def get_chat(**kwargs):
 
 def get_text_embedding(model:str = None, **kwargs):
     """Returns langchain OpenAI embeddings compatible client for general text embeddings."""
-    default_model = model or "text-embedding-granite-embedding-278m-multilingual"
+    default_model = model or "ibm-granite/granite-embedding-278m-multilingual"
     return get_embeddings(model=default_model, **kwargs)
 
 def get_embeddings(model:str, **kwargs):

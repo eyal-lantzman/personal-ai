@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock, call, ANY
 from typing import Generator
 from agent.web_search import search_tool, RATE_CALLS, RATE_PER_SECONDS
 from ratelimit.exception import RateLimitException
@@ -32,7 +32,7 @@ async def test_search_tool_happy_path(ddg_service_mock:MagicMock, happy_path_val
     result = await search_tool.ainvoke({"query": "my query", "num_results": 1})
 
     # Assert
-    ddg_service_mock.assert_called_once_with(output_format="json", backend="text", region="wt-wt", num_results=1)
+    ddg_service_mock.assert_called_once_with(output_format='json', backend='text', num_results=1, region='wt-wt', api_wrapper=ANY)
     invoke.assert_called_once_with("my query")
     assert result == happy_path_value
 
@@ -48,9 +48,9 @@ async def test_search_tool_sleep_and_retry(ddg_service_mock:MagicMock, happy_pat
 
     # Assert
     ddg_service_mock.assert_has_calls([
-        call(output_format="json", backend="text", region="wt-wt", num_results=1),
+        call(output_format="json", backend="text", num_results=1, region='wt-wt', api_wrapper=ANY),
         call().invoke('my query'),
-        call(output_format="json", backend="text", region="wt-wt", num_results=1),
+        call(output_format="json", backend="text", num_results=1, region='wt-wt', api_wrapper=ANY),
         call().invoke('my query'),
         ])
     assert result == happy_path_value
