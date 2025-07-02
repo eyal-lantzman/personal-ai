@@ -201,6 +201,7 @@ def test_schedule_with_provided_id(under_test:ActionManager):
     outcome2 = under_test.wait_for_execution(id="test1", keep_storing_result=False)
     outcome3 = under_test.wait_for_execution(id="test1")
     outcome4 = under_test.wait_for_execution(id="test2")
+
     # Assert
     assert outcome1 is outcome2
     assert outcome1.result == 42
@@ -276,7 +277,8 @@ def test_schedule_with_concurrency(threads):
         under_test.stop()
 
 @pytest.mark.asyncio
-async def test_schedule_with_concurrency_multiple_await_the_same_id():
+@pytest.mark.parametrize("loop", range(10))
+async def test_schedule_with_concurrency_multiple_await_the_same_id(loop):
     # Arrnage
     threads = 10
     under_test = ActionManager(10)
@@ -316,3 +318,91 @@ async def test_schedule_with_concurrency_multiple_await_the_same_id():
         assert len(under_test.outgoing) == 0
     finally:
         under_test.stop()
+
+@pytest.mark.parametrize("loop", range(10))
+def test_schedule_and_cancel_scheduled(under_test:ActionManager, loop):
+    # Arrnage
+    counter = 0
+    def inc():
+        nonlocal counter
+        counter += 1
+
+    task = under_test.schedule(func=inc, id="task1", priority=1)
+
+    # Act
+    task.cancel()
+    under_test.start()
+    under_test.wait_for_empty_queue()
+    outcome = under_test.wait_for_execution(id="task1")
+
+    # Assert
+    assert outcome is None
+    assert counter == 0
+
+@pytest.mark.parametrize("loop", range(10))
+def test_schedule_and_cancel_execution(under_test:ActionManager, loop):
+    # Arrnage
+    counter = 0
+    def inc():
+        nonlocal counter
+        time.sleep(2) # Simulate a long-running task
+        counter += 1
+        return counter
+    
+    under_test.schedule(func=func_with_return_value, id="task1", priority=1)
+    under_test.schedule(func=func_with_return_value, id="task2", priority=2)
+    under_test.schedule(func=inc, id="task3", priority=3)
+    under_test.start()
+    under_test.wait_for_empty_queue()
+    assert under_test.cancel("task3")
+    
+    # Act
+    outcome1 = under_test.wait_for_execution(id="task1")
+    outcome3 = under_test.wait_for_execution(id="task2")
+    outcome2 = under_test.wait_for_execution(id="task3")
+
+    # Assert
+    assert outcome1.result == 42
+    assert not outcome1.cancelled
+    assert outcome1.completed
+    assert outcome1.last_error is None
+
+    assert outcome2 is None
+    assert counter == 0
+
+    assert outcome3.result == 42
+    assert not outcome3.cancelled
+    assert outcome3.completed
+    assert outcome3.last_error is None
+
+
+@pytest.mark.parametrize("loop", range(10))
+def test_schedule_and_cancel_all_execution(under_test:ActionManager, loop):
+    # Arrnage
+    counter = 0
+    def task1():
+        nonlocal counter
+        time.sleep(2) # Simulate a long-running task
+        counter += 1
+        return counter
+
+    def task2():
+        nonlocal counter
+        time.sleep(2) # Simulate a long-running task
+        counter += 1
+        return counter
+    
+    under_test.schedule(func=task1, id="task1", priority=1)
+    under_test.schedule(func=task2, id="task2", priority=3)
+    under_test.start()
+    under_test.wait_for_empty_queue()
+    assert under_test.cancel_all()
+    
+    # Act
+    outcome1 = under_test.wait_for_execution(id="task1")
+    outcome2 = under_test.wait_for_execution(id="task2")
+
+    # Assert
+    assert outcome1 is None
+    assert outcome2 is None
+    assert counter == 0

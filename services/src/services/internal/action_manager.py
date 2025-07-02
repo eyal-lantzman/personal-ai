@@ -29,7 +29,7 @@ class _Runnable(BaseModel):
     args: Optional[list] = Field(default_factory=list)
     kwargs : Optional[dict] = Field(default_factory=dict)
     result:ActionResult = Field(default_factory=ActionResult)
-    task: Optional[asyncio.Task[ActionResult]] = None
+    #task: Optional[asyncio.Task[ActionResult]] = None
 
     def __lt__(self, other):
         return self.timestamp < other.timestamp
@@ -63,11 +63,19 @@ class ActionManager:
         self.loop.set_default_executor(concurrent.futures.ThreadPoolExecutor(max_workers=concurrency))
         self.incoming = asyncio.queues.PriorityQueue[_Runnable](max_size)
         self.outgoing = dict[str, asyncio.Task[ActionResult]]()
-
+        self.cancelled = set[str]()
         self.looping = False
 
+    def _scheduled(self, future:asyncio.Task[str], id:str):
+        future.remove_done_callback(self._scheduled)
+        if future.cancelled():
+            self.outgoing.pop(id, None)
+
     def schedule(self, func:Callable, *args, id:str=None, priority:int=10, callback=None, **kwargs) -> asyncio.Task[str]:
-        """Schedule function call, and wait until scheduled.
+        """Schedule function call, and doesn't wait until fully scheduled.
+        To cancel the scheduling, use the returned task.
+        To get the assigned id of the scheduled task, use `await_for_completion(task)` or `wait_for_completion(task)`.
+        To get the final execution result, use `await_for_execution(id)` or `wait_for_execution(id)`.
 
         Args:
             func (function): The function to call
@@ -84,11 +92,12 @@ class ActionManager:
         runnable = _Runnable(func=func, args=args, kwargs=kwargs, id=runnable_id, callback=callback)
         runnable.result = ActionResult()
 
-        async def _run():
+        async def _enqueue():
             await self.incoming.put((priority, runnable))
             return runnable.id
 
-        task = self.loop.create_task(_run(), name="enqueue")
+        task = self.loop.create_task(_enqueue(), name="enqueue")
+        task.add_done_callback(functools.partial(self._scheduled, id=runnable_id))
         self.outgoing[runnable.id] = None
 
         return task
@@ -113,33 +122,67 @@ class ActionManager:
                 self.loop.call_soon(runnable.callback, runnable.result)
         return runnable.result
 
+    def _executed(self, future:asyncio.Future[ActionResult], id:str)-> object:
+        future.remove_done_callback(self._executed)
+        # If scheduled task reached this far, make sure it's in ends up in the outgoing
+        if id not in self.outgoing:
+            self.outgoing[id] = future
+
     async def _run(self):
         while self.looping:
             try:
                 priority, work = await self.incoming.get()
                 future = self.loop.run_in_executor(None, self._do_work, work)
+                future.add_done_callback(functools.partial(self._executed, id=work.id))
+                #work.task = future
                 self.outgoing[work.id] = future
                 self.incoming.task_done()
             except asyncio.CancelledError as e:
                 raise
-            except Exception as e:
-                logger.error(e)
 
     def start(self):
+        """Start the action manager.
+        This will start the background task that will process the scheduled tasks."""
         self.looping = True
         self.background_run = self.loop.create_task(self._run(), name="background_run")
 
     def wait_for_empty_queue(self):
+        """Wait for the incoming queue to be empty.
+        This is useful to ensure that all scheduled tasks have been processed.
+        """
         while not self.incoming.empty():
             self.loop.run_until_complete(asyncio.sleep(1))
 
-    def wait_for_completion(self, awaitable:asyncio.Task | asyncio.Future):
-       return self.loop.run_until_complete(awaitable)
+    def wait_for_completion(self, awaitable:asyncio.Task | asyncio.Future) -> Any:
+        """Wait for the completion of the given awaitable.
+        Args: 
+            awaitable (asyncio.Task | asyncio.Future): The awaitable to wait for.
+        Returns: 
+            Any: The result of the action or None if the awaitable was cancelled.
+        """
+        # Run the awaitable in the event loop and return the result
+        if awaitable.cancelled():
+            return None
+        return self.loop.run_until_complete(awaitable)
 
-    async def await_for_completion(self, awaitable:asyncio.Task | asyncio.Future):
+    async def await_for_completion(self, awaitable:asyncio.Task | asyncio.Future) -> Any:
+       """Wait for the completion of the given awaitable.
+       Args:
+            awaitable (asyncio.Task | asyncio.Future): The awaitable to wait for.
+        Returns: 
+            Any: The result of the action.
+       """
        return await awaitable
 
     async def await_for_execution(self, id:str, keep_storing_result:bool=False) -> ActionResult:
+        """Wait for the execution of the action with the given id.
+        Args:
+            id (str): The id of the action to wait for.
+            keep_storing_result (bool): If True, the result will be kept in the outgoing dict.
+                                        If False, the result will be removed from the outgoing dict.
+        Returns:
+            ActionResult: The result of the action, or None if the action was not found.
+        """
         if id not in self.outgoing:
             return None
           
@@ -157,7 +200,7 @@ class ActionManager:
             # Could be a race condition between the first IF and the get(id,...)
             return None
         
-        if awaitable is None:
+        if awaitable is None or awaitable is missing:
             # Some other request popped it
             return None
 
@@ -167,12 +210,7 @@ class ActionManager:
             if not keep_storing_result:
                 self.outgoing.pop(id, None)
 
-    
-    @functools.lru_cache
-    def wait_for_execution(self, id:str, keep_storing_result:bool=False) -> ActionResult:
-        if id not in self.outgoing:
-            return None
-        
+    def _get_awaitable(self, id:str) -> asyncio.Task | None:
         missing = object()
         try:
             # The future is set after the scheduling tasks completed 
@@ -185,6 +223,26 @@ class ActionManager:
             # Could be a race condition between the first IF and the get(id,...)
             return None
         
+        if awaitable is None or awaitable is missing:
+            return None
+        
+        return self.outgoing.get(id, None)
+    
+    @functools.lru_cache
+    def wait_for_execution(self, id:str, keep_storing_result:bool=False) -> ActionResult:
+        """Wait for the execution of the action with the given id.
+        Args:
+            id (str): The id of the action to wait for.
+            keep_storing_result (bool): If True, the result will be kept in the outgoing dict.
+                                        If False, the result will be removed from the outgoing dict.
+        Returns:
+            ActionResult: The result of the action, or None if the action was not found.
+        """
+        if id not in self.outgoing:
+            return None
+        
+        awaitable = self._get_awaitable(id)
+        
         if awaitable is None:
             return None
         
@@ -193,8 +251,45 @@ class ActionManager:
         finally:
             if not keep_storing_result:
                 self.outgoing.pop(id, None)
+    
+    def cancel(self, id:str) -> bool:
+        """Cancel the action with the given id.
+
+        Args:
+            id (str): The id of the action to cancel.
+
+        Returns:
+            bool: True if the action was cancelled, False otherwise.
+        """
+        if id not in self.outgoing:
+            return False
         
+        awaitable = self._get_awaitable(id)
+        
+        return awaitable.cancel()
+
+    def cancel_all(self, msg: Any|None = None) -> bool:
+        """Cancel all actions in the action manager.
+
+        Args:
+            msg (Any|None): Optional message to pass to the cancellation.
+        
+        Returns:
+            bool: True if any action was cancelled, False otherwise.
+        """
+        cancelled = False
+        for id in list(self.outgoing.keys()):
+            cancelled |= self.cancel(id)
+        
+        return cancelled
+
     def stop(self, msg: Any|None = None) -> bool:
+        """Stop the action manager and cancel all running tasks.
+        Args:
+            msg (Any|None): Optional message to pass to the cancellation.
+        Returns:
+            bool: True if the action manager was stopped, False if it was not running.
+        """
         if self.looping:
             self.looping = False
             cancelled = self.background_run.cancel(msg)
