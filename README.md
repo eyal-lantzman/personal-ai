@@ -30,6 +30,7 @@ The project is divided into two main directories:
 
 -   `frontend/`: Contains the React application built with Vite.
 -   `backend/`: Contains the LangGraph/FastAPI application, including the research agent logic.
+-   `services/`: Contains the Services layer, including OpenAI APIs etc.
 
 ## Getting Started: Development and Local Testing
 
